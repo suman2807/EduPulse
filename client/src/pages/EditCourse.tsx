@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { Plus, Trash2, Save } from 'lucide-react';
+import { useToast } from '../contexts/ToastContext';
+import { Plus, Trash2, Save, Upload, X } from 'lucide-react';
 
 interface Module {
+  _id?: string;
   title: string;
   description: string;
   content: string;
@@ -11,39 +13,128 @@ interface Module {
   duration: number;
   order: number;
 }
-function getYouTubeEmbedUrl(url: string): string | null {
-  const match = url.match(
-    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/
-  );
-  return match ? `https://www.youtube.com/embed/${match[1]}` : null;
+
+interface Course {
+  _id: string;
+  title: string;
+  description: string;
+  category: string;
+  level: string;
+  thumbnail?: string;
+  modules: Module[];
 }
-const CreateCourse: React.FC = () => {
+
+const EditCourse: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { success, error } = useToast();
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [courseData, setCourseData] = useState({
     title: '',
     description: '',
     category: '',
     level: 'beginner',
-    price: 0,
-    isPublished: false
+    thumbnail: ''
   });
-  const [modules, setModules] = useState<Module[]>([{
-    title: '',
-    description: '',
-    content: '',
-    videoUrl: '',
-    duration: 0,
-    order: 0
-  }]);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string>('');
+  const [modules, setModules] = useState<Module[]>([]);
+
+  useEffect(() => {
+    const fetchCourse = async () => {
+      try {
+        const response = await api.get(`/api/courses/${id}`);
+        const course: Course = response.data;
+        
+        setCourseData({
+          title: course.title,
+          description: course.description,
+          category: course.category,
+          level: course.level,
+          thumbnail: course.thumbnail || ''
+        });
+        
+        // Set thumbnail preview if exists
+        if (course.thumbnail) {
+          setThumbnailPreview(`http://localhost:5001${course.thumbnail}`);
+        }
+        
+        setModules(course.modules.sort((a, b) => a.order - b.order));
+      } catch (err: unknown) {
+        console.error('Error fetching course:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load course data';
+        if (typeof err === 'object' && err !== null && 'response' in err) {
+          const axiosError = err as { response?: { data?: { message?: string } } };
+          error('Failed to Load Course', axiosError.response?.data?.message || errorMessage);
+        } else {
+          error('Failed to Load Course', errorMessage);
+        }
+        navigate('/dashboard');
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+
+    fetchCourse();
+  }, [id, navigate]);
+
+  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        error('Invalid File Type', 'Please select an image file.');
+        return;
+      }
+      
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        error('File Too Large', 'Please select an image smaller than 5MB.');
+        return;
+      }
+      
+      setThumbnailFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setThumbnailPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeThumbnail = () => {
+    setThumbnailFile(null);
+    setThumbnailPreview('');
+    setCourseData({ ...courseData, thumbnail: '' });
+  };
+
+  const uploadThumbnail = async (): Promise<string> => {
+    if (!thumbnailFile) return courseData.thumbnail;
+    
+    const formData = new FormData();
+    formData.append('thumbnail', thumbnailFile);
+    
+    try {
+      const response = await api.put(`/api/courses/${id}/thumbnail`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data.thumbnail;
+    } catch (err) {
+      error('Upload Failed', 'Failed to upload thumbnail image.');
+      throw err;
+    }
+  };
 
   const handleCourseChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
     setCourseData({
       ...courseData,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked 
-             : type === 'number' ? Number(value) 
-             : value
+      [name]: value
     });
   };
 
@@ -82,35 +173,54 @@ const CreateCourse: React.FC = () => {
     setLoading(true);
 
     try {
+      // Upload thumbnail if a new file is provided
+      let thumbnailPath = courseData.thumbnail;
+      if (thumbnailFile) {
+        thumbnailPath = await uploadThumbnail();
+      }
+
       const coursePayload = {
         ...courseData,
+        thumbnail: thumbnailPath,
         modules: modules.map((module, index) => ({
           ...module,
           order: index
         }))
       };
 
-      await api.post('/api/courses', coursePayload);
-      alert('Course created successfully!');
-      navigate('/dashboard');
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create course';
-      if (typeof error === 'object' && error !== null && 'response' in error) {
-        const axiosError = error as { response?: { data?: { message?: string } } };
-        alert(axiosError.response?.data?.message || errorMessage);
+      await api.put(`/api/courses/${id}`, coursePayload);
+      success('Course Updated Successfully!', 'Your course changes have been saved and are now live.');
+      
+      // Add a small delay to ensure the toast is rendered before navigation
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 100);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update course';
+      if (typeof err === 'object' && err !== null && 'response' in err) {
+        const axiosError = err as { response?: { data?: { message?: string } } };
+        error('Failed to Update Course', axiosError.response?.data?.message || errorMessage);
       } else {
-        alert(errorMessage);
+        error('Failed to Update Course', errorMessage);
       }
     } finally {
       setLoading(false);
     }
   };
 
+  if (initialLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Create New Course</h1>
-        <p className="text-gray-600">Share your knowledge by creating an engaging course</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Edit Course</h1>
+        <p className="text-gray-600">Update your course content and settings</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
@@ -149,6 +259,52 @@ const CreateCourse: React.FC = () => {
               />
             </div>
 
+            {/* Thumbnail Upload */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Course Thumbnail (Optional)
+              </label>
+              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors">
+                <div className="space-y-1 text-center">
+                  {thumbnailPreview ? (
+                    <div className="relative">
+                      <img
+                        src={thumbnailPreview}
+                        alt="Thumbnail preview"
+                        className="mx-auto h-32 w-32 object-cover rounded-lg"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeThumbnail}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                      <div className="flex text-sm text-gray-600">
+                        <label className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                          <span>Upload a file</span>
+                          <input
+                            type="file"
+                            className="sr-only"
+                            accept="image/*"
+                            onChange={handleThumbnailChange}
+                          />
+                        </label>
+                        <p className="pl-1">or drag and drop</p>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        PNG, JPG, WebP up to 5MB
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Category
@@ -180,35 +336,7 @@ const CreateCourse: React.FC = () => {
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Price ($)
-              </label>
-              <input
-                type="number"
-                name="price"
-                min="0"
-                step="0.01"
-                value={courseData.price}
-                onChange={handleCourseChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="0.00"
-              />
-            </div>
 
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                name="isPublished"
-                id="isPublished"
-                checked={courseData.isPublished}
-                onChange={handleCourseChange}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="isPublished" className="ml-2 block text-sm text-gray-700">
-                Publish course immediately
-              </label>
-            </div>
           </div>
         </div>
 
@@ -228,7 +356,7 @@ const CreateCourse: React.FC = () => {
 
           <div className="space-y-6">
             {modules.map((module, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-6">
+              <div key={module._id || index} className="border border-gray-200 rounded-lg p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium text-gray-900">Module {index + 1}</h3>
                   {modules.length > 1 && (
@@ -285,29 +413,18 @@ const CreateCourse: React.FC = () => {
                     />
                   </div>
 
-                   <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Video URL (YouTube only)</label>
-                <input
-                  type="url"
-                  value={module.videoUrl}
-                  onChange={(e) => handleModuleChange(index, 'videoUrl', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="https://www.youtube.com/watch?v=..."
-                />
-                {module.videoUrl && getYouTubeEmbedUrl(module.videoUrl) && (
-                  <div className="mt-4">
-                    <iframe
-                      width="100%"
-                      height="315"
-                      src={getYouTubeEmbedUrl(module.videoUrl)!}
-                      title={`Module Video Preview ${index + 1}`}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      className="rounded-lg border"
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Video URL (Optional)
+                    </label>
+                    <input
+                      type="url"
+                      value={module.videoUrl}
+                      onChange={(e) => handleModuleChange(index, 'videoUrl', e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="https://example.com/video.mp4"
                     />
                   </div>
-                )}
-              </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -343,7 +460,7 @@ const CreateCourse: React.FC = () => {
             className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="h-4 w-4" />
-            <span>{loading ? 'Creating...' : 'Create Course'}</span>
+            <span>{loading ? 'Updating...' : 'Update Course'}</span>
           </button>
         </div>
       </form>
@@ -351,4 +468,4 @@ const CreateCourse: React.FC = () => {
   );
 };
 
-export default CreateCourse;
+export default EditCourse;

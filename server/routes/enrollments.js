@@ -105,4 +105,40 @@ router.put('/progress/:enrollmentId/:moduleId', auth, async (req, res) => {
   }
 });
 
+// Unenroll from course
+router.delete('/unenroll/:courseId', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'Only students can unenroll from courses' });
+    }
+
+    const course = await Course.findById(req.params.courseId);
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found' });
+    }
+
+    const enrollment = await Enrollment.findOne({
+      student: req.user.userId,
+      course: req.params.courseId
+    });
+
+    if (!enrollment) {
+      return res.status(404).json({ message: 'Enrollment not found' });
+    }
+
+    // Remove enrollment
+    await Enrollment.findByIdAndDelete(enrollment._id);
+    
+    // Remove student from course's enrolled students
+    course.enrolledStudents = course.enrolledStudents.filter(
+      studentId => studentId.toString() !== req.user.userId
+    );
+    await course.save();
+
+    res.json({ message: 'Successfully unenrolled from course' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 export default router;

@@ -2,6 +2,7 @@ import express from 'express';
 import Course from '../models/Course.js';
 import Enrollment from '../models/Enrollment.js';
 import { auth } from '../middleware/auth.js';
+import upload from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -33,6 +34,25 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Upload thumbnail for course
+router.post('/upload-thumbnail', auth, upload.single('thumbnail'), async (req, res) => {
+  try {
+    if (req.user.role !== 'instructor' && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    // Return the file path that can be used in the database
+    const thumbnailPath = `/uploads/thumbnails/${req.file.filename}`;
+    res.json({ thumbnail: thumbnailPath });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Create course (Instructor only)
 router.post('/', auth, async (req, res) => {
   try {
@@ -49,6 +69,37 @@ router.post('/', auth, async (req, res) => {
     await course.populate('instructor', 'name avatar');
     
     res.status(201).json(course);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Update course thumbnail
+router.put('/:id/thumbnail', auth, upload.single('thumbnail'), async (req, res) => {
+  try {
+    const course = await Course.findById(req.params.id);
+    
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found' });
+    }
+
+    if (course.instructor.toString() !== req.user.userId && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    // Update the course with new thumbnail path
+    const thumbnailPath = `/uploads/thumbnails/${req.file.filename}`;
+    const updatedCourse = await Course.findByIdAndUpdate(
+      req.params.id,
+      { thumbnail: thumbnailPath },
+      { new: true }
+    ).populate('instructor', 'name avatar');
+    
+    res.json({ thumbnail: thumbnailPath, course: updatedCourse });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

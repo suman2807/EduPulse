@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
+import { calculateCourseDuration } from '../lib/duration';
 import { Plus, BookOpen, Users, Eye, Edit, Trash2 } from 'lucide-react';
 
 interface Course {
   _id: string;
   title: string;
   description: string;
+  thumbnail?: string;
   category: string;
   level: string;
   enrolledStudents: string[];
@@ -165,6 +167,9 @@ const InstructorDashboard: React.FC = () => {
                         <span className="flex items-center">
                           <BookOpen className="h-4 w-4 mr-1" />
                           {course.modules.length} modules
+                        </span>
+                        <span>
+                          {calculateCourseDuration(course.modules)} total
                         </span>
                         <span>{course.category}</span>
                         <span className="capitalize">{course.level}</span>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ToastProvider } from './contexts/ToastContext';
 import LandingPage from './pages/LandingPage';
 import Navbar from './components/Navbar';
 import Login from './pages/Login';
@@ -96,9 +97,11 @@ const AppContent: React.FC = () => {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
+      <ToastProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </ToastProvider>
     </AuthProvider>
   );
 }

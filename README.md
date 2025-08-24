@@ -1,4 +1,4 @@
-# Online Learning Portal
+# EduPulse - Online Learning Portal
 
 A modern, full-stack online learning platform built with React, TypeScript, Node.js, and MongoDB.
 
@@ -13,71 +13,47 @@ A modern, full-stack online learning platform built with React, TypeScript, Node
 
 ## 🛠️ Tech Stack
 
-### Frontend
+### Frontend (`/client`)
 - React 18 with TypeScript
 - Vite for fast development
 - Tailwind CSS for styling
 - React Router for navigation
+- Axios for API calls
 
-### Backend
+### Backend (`/server`)
 - Node.js with Express
 - MongoDB with Mongoose
 - JWT authentication
 - Multer for file uploads
+- bcryptjs for password hashing
 
 ## 📁 Project Structure
 
 ```
 Online-Learniing-Portal-main/
-├── 📁 src/                    # Frontend source code
-│   ├── 📁 components/        # Reusable UI components
-│   │   ├── LoadingSpinner.tsx
-│   │   ├── LogoIcon.tsx
-│   │   └── Navbar.tsx
-│   ├── 📁 contexts/          # React contexts (Auth)
-│   │   └── AuthContext.tsx
-│   ├── 📁 lib/               # Utility functions and API
-│   │   └── api.ts
-│   └── 📁 pages/             # Application pages
-│       ├── AdminDashboard.tsx
-│       ├── BrowseCourses.tsx
-│       ├── CourseDetails.tsx
-│       ├── CourseViewer.tsx
-│       ├── CreateCourse.tsx
-│       ├── EditCourse.tsx
-│       ├── InstructorDashboard.tsx
-│       ├── LandingPage.tsx
-│       ├── Login.tsx
-│       ├── Register.tsx
-│       └── StudentDashboard.tsx
-├── 📁 server/                # Backend source code
-│   ├── 📁 models/            # MongoDB models
-│   │   ├── Course.js
-│   │   ├── Enrollment.js
-│   │   └── User.js
-│   ├── 📁 routes/            # API endpoints
-│   │   ├── auth.js
-│   │   ├── courses.js
-│   │   ├── enrollments.js
-│   │   └── users.js
-│   ├── 📁 middleware/        # Express middleware
-│   │   └── auth.js
-│   └── index.js              # Server entry point
-├── 📄 index.html             # Main HTML file
-├── 📄 package.json           # Dependencies and scripts
-├── 📄 tsconfig.json          # TypeScript configuration
-├── 📄 vite.config.ts         # Vite configuration
-├── 📄 tailwind.config.js     # Tailwind CSS configuration
-├── 📄 postcss.config.js      # PostCSS configuration
-├── 📄 eslint.config.js       # ESLint configuration
-└── 📄 .gitignore             # Git ignore rules
+├── client/                 # Frontend React application
+│   ├── src/
+│   │   ├── components/     # Reusable UI components
+│   │   ├── contexts/       # React contexts (Auth)
+│   │   ├── lib/            # API utilities
+│   │   └── pages/          # Application pages
+│   └── package.json        # Client dependencies
+├── server/                 # Backend Node.js application
+│   ├── models/             # MongoDB models
+│   ├── routes/             # API endpoints
+│   ├── middleware/         # Express middleware
+│   ├── .env                # Server environment variables
+│   └── package.json        # Server dependencies
+├── .gitignore              # Git ignore rules
+└── README.md               # This file
 ```
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 18+ 
-- MongoDB installed and running
+- Node.js 18+
+- MongoDB (local or cloud)
+- npm or yarn
 
 ### Installation
 
@@ -89,41 +65,61 @@ Online-Learniing-Portal-main/
 
 2. **Install dependencies**
    ```bash
+   # Install client dependencies
+   cd client
+   npm install
+   
+   # Install server dependencies
+   cd ../server
    npm install
    ```
 
-3. **Set up environment variables**
-   Create a `.env` file in the root directory:
+3. **Environment Setup**
+   
+   **Server** (`/server/.env`):
    ```env
+   PORT=5001
    MONGODB_URI=your_mongodb_connection_string
    JWT_SECRET=your_jwt_secret_key
-   PORT=5000
    ```
 
-4. **Run the application**
-   ```bash
-   # Development mode (runs both frontend and backend)
-   npm run dev
+4. **Start the application**
    
-   # Or run separately:
-   npm run client    # Frontend only
-   npm run server    # Backend only
+   **Terminal 1 - Backend:**
+   ```bash
+   cd server
+   npm run dev
+   ```
+   
+   **Terminal 2 - Frontend:**
+   ```bash
+   cd client
+   npm run dev
    ```
 
-5. **Build for production**
-   ```bash
-   npm run build
-   ```
+5. **Access the application**
+   - Frontend: http://localhost:5173/
+   - Backend API: http://localhost:5001/api/
 
 ## 📱 Available Scripts
 
-- `npm run dev` - Start both frontend and backend in development mode
-- `npm run client` - Start only the frontend (Vite dev server)
-- `npm run server` - Start only the backend (Node.js server)
-- `npm run build` - Build the frontend for production
-- `npm run lint` - Run ESLint to check code quality
+### Client (`/client`)
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
 
-## 🔐 API Endpoints
+### Server (`/server`)
+- `npm run dev` - Start development server with nodemon
+- `npm start` - Start production server
+
+## 🔐 Default Admin Account
+
+The system automatically creates an admin account:
+- **Email**: admin@example.com
+- **Password**: admin123
+
+## 🔗 API Endpoints
 
 - `POST /api/auth/register` - User registration
 - `POST /api/auth/login` - User login
@@ -131,6 +127,7 @@ Online-Learniing-Portal-main/
 - `POST /api/courses` - Create new course (instructor only)
 - `GET /api/enrollments` - Get user enrollments
 - `POST /api/enrollments` - Enroll in a course
+- `GET /api/users` - Get users (admin only)
 
 ## 🤝 Contributing
 

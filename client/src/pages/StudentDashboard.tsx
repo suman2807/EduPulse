@@ -129,8 +129,16 @@ const StudentDashboard: React.FC = () => {
                   key={enrollment._id}
                   className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
                 >
-                  <div className="aspect-video bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
-                    <Play className="h-12 w-12 text-white" />
+                  <div className="aspect-video bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center overflow-hidden">
+                    {enrollment.course?.thumbnail ? (
+                      <img
+                        src={`http://localhost:5001${enrollment.course.thumbnail}`}
+                        alt={enrollment.course?.title ?? "Course thumbnail"}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Play className="h-12 w-12 text-white" />
+                    )}
                   </div>
 
                   <div className="p-4">

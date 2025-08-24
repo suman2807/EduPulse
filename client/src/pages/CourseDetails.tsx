@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { calculateCourseDuration } from '../lib/duration';
 import { Clock, Users, BookOpen, Play, CheckCircle } from 'lucide-react';
 
 interface Course {
@@ -35,10 +37,12 @@ interface Course {
 const CourseDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { success: showSuccess, error: showError } = useToast();
   const navigate = useNavigate();
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
+  const [unenrolling, setUnenrolling] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
 
   useEffect(() => {
@@ -70,7 +74,7 @@ const CourseDetails: React.FC = () => {
     }
 
     if (user.role !== 'student') {
-      alert('Only students can enroll in courses');
+      showError('Only students can enroll in courses');
       return;
     }
 
@@ -78,14 +82,14 @@ const CourseDetails: React.FC = () => {
     try {
       await api.post(`/api/enrollments/enroll/${id}`);
       setIsEnrolled(true);
-      alert('Successfully enrolled in the course!');
+      showSuccess('Successfully enrolled in the course!');
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to enroll in course';
       if (typeof error === 'object' && error !== null && 'response' in error) {
         const axiosError = error as { response?: { data?: { message?: string } } };
-        alert(axiosError.response?.data?.message || errorMessage);
+        showError(axiosError.response?.data?.message || errorMessage);
       } else {
-        alert(errorMessage);
+        showError(errorMessage);
       }
     } finally {
       setEnrolling(false);
@@ -94,6 +98,43 @@ const CourseDetails: React.FC = () => {
 
   const handleStartLearning = () => {
     navigate(`/learn/${id}`);
+  };
+
+  const handleUnenroll = async () => {
+    if (!user || !course) return;
+
+    const confirmUnenroll = window.confirm(
+      `Are you sure you want to unenroll from "${course.title}"? This will remove all your progress.`
+    );
+
+    if (!confirmUnenroll) return;
+
+    setUnenrolling(true);
+    try {
+      await api.delete(`/api/enrollments/unenroll/${id}`);
+      setIsEnrolled(false);
+      showSuccess('Successfully unenrolled from the course');
+      
+      // Update enrolled students count
+      if (course) {
+        setCourse({
+          ...course,
+          enrolledStudents: course.enrolledStudents.filter(
+            studentId => studentId !== user.id
+          )
+        });
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to unenroll from course';
+      if (typeof error === 'object' && error !== null && 'response' in error) {
+        const axiosError = error as { response?: { data?: { message?: string } } };
+        showError(axiosError.response?.data?.message || errorMessage);
+      } else {
+        showError(errorMessage);
+      }
+    } finally {
+      setUnenrolling(false);
+    }
   };
 
   if (loading) {
@@ -143,7 +184,7 @@ const CourseDetails: React.FC = () => {
               </div>
               <div className="flex items-center">
                 <Clock className="h-4 w-4 mr-1" />
-                {Math.ceil(course.modules.reduce((total, module) => total + module.duration, 0) / 60)} hours
+                {calculateCourseDuration(course.modules)}
               </div>
             </div>
           </div>
@@ -194,21 +235,38 @@ const CourseDetails: React.FC = () => {
         <div className="lg:col-span-1">
           {/* Course Preview */}
           <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100 sticky top-8">
-            <div className="aspect-video bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
-              <Play className="h-16 w-16 text-white" />
+            <div className="aspect-video bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center overflow-hidden">
+              {course.thumbnail ? (
+                <img
+                  src={`http://localhost:5001${course.thumbnail}`}
+                  alt={course.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <Play className="h-16 w-16 text-white" />
+              )}
             </div>
             
             <div className="p-6">
               {user?.role === 'student' && (
                 <div className="mb-6">
                   {isEnrolled ? (
-                    <button
-                      onClick={handleStartLearning}
-                      className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 px-4 rounded-lg font-medium hover:from-green-700 hover:to-green-800 transition-all duration-200 flex items-center justify-center"
-                    >
-                      <CheckCircle className="h-5 w-5 mr-2" />
-                      Continue Learning
-                    </button>
+                    <div className="space-y-2">
+                      <button
+                        onClick={handleStartLearning}
+                        className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 px-4 rounded-lg font-medium hover:from-green-700 hover:to-green-800 transition-all duration-200 flex items-center justify-center"
+                      >
+                        <CheckCircle className="h-5 w-5 mr-2" />
+                        Continue Learning
+                      </button>
+                      <button
+                        onClick={handleUnenroll}
+                        disabled={unenrolling}
+                        className="w-full bg-red-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-red-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                      >
+                        {unenrolling ? 'Unenrolling...' : 'Unenroll from Course'}
+                      </button>
+                    </div>
                   ) : (
                     <button
                       onClick={handleEnroll}

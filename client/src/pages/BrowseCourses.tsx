@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
+import { calculateCourseDuration } from '../lib/duration';
 import { Search, Clock, Users, Play } from 'lucide-react';
 
 interface Course {
@@ -148,8 +149,16 @@ const BrowseCourses: React.FC = () => {
             key={course._id}
             className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-shadow duration-300"
           >
-            <div className="aspect-video bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center relative">
-              <Play className="h-12 w-12 text-white" />
+            <div className="aspect-video bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center relative overflow-hidden">
+              {course.thumbnail ? (
+                <img
+                  src={`http://localhost:5001${course.thumbnail}`}
+                  alt={course.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <Play className="h-12 w-12 text-white" />
+              )}
               <div className="absolute top-4 right-4">
                 <span className="bg-white bg-opacity-90 text-gray-900 px-2 py-1 rounded-full text-xs font-medium capitalize">
                   {course.level}
@@ -187,7 +196,7 @@ const BrowseCourses: React.FC = () => {
                 </div>
                 <div className="flex items-center text-gray-500 text-sm">
                   <Clock className="h-4 w-4 mr-1" />
-                  {course.modules.length} modules
+                  {calculateCourseDuration(course.modules)} • {course.modules.length} modules
                 </div>
               </div>
 
